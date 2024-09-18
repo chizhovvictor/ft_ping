@@ -12,6 +12,23 @@
 #include <fcntl.h>
 #include <signal.h>
 
+char* error_message = "usage: ping [-AaDdfnoQqRrv] [-c count] [-G sweepmaxsize]\n"
+                      "            [-g sweepminsize] [-h sweepincrsize] [-i wait]\n"
+                      "            [-l preload] [-M mask | time] [-m ttl] [-p pattern]\n"
+                      "            [-S src_addr] [-s packetsize] [-t timeout][-W waittime]\n"
+                      "            [-z tos] host\n"
+                      "       ping [-AaDdfLnoQqRrv] [-c count] [-I iface] [-i wait]\n"
+                      "            [-l preload] [-M mask | time] [-m ttl] [-p pattern] [-S src_addr]\n"
+                      "            [-s packetsize] [-T ttl] [-t timeout] [-W waittime]\n"
+                      "            [-z tos] mcast-group\n"
+                      "Apple specific options (to be specified before mcast-group or host like all options)\n"
+                      "            -b boundif           # bind the socket to the interface\n"
+                      "            -k traffic_class     # set traffic class socket option\n"
+                      "            -K net_service_type  # set traffic class socket options\n"
+                      "            --apple-connect      # call connect(2) in the socket\n"
+                      "            --apple-time         # display current time\n";
+
+
 #define PING_PKT_S 64
 #define PORT_NO 0
 int pingloop = 1;
@@ -36,6 +53,7 @@ struct ping_pkt {
     char msg[PING_PKT_S - sizeof(struct icmphdr)]; // Данные пакета
 };
 
+
 unsigned short checksum(void *b, int len) {
     unsigned short *buf = b;      // Преобразуем указатель на данные в указатель на массив 16-битных чисел (unsigned short)
     unsigned int sum = 0;         // Инициализируем переменную для хранения суммы
@@ -59,7 +77,6 @@ unsigned short checksum(void *b, int len) {
 // Функция для преобразования доменного имени в IP-адрес
 
 char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
-    printf("\nResolving DNS...\n");
     struct hostent *host_entity;
     char *ip = (char *)malloc(NI_MAXHOST * sizeof(char));
 
@@ -81,27 +98,27 @@ void intHandler(int dummy) {
 }
 
 // Функция для преобразования IP-адреса в доменное имя
-char *reverse_dns_lookup(char *ip_addr) {
-    struct sockaddr_in temp_addr;
-    socklen_t len;
-    char buf[NI_MAXHOST], *ret_buf;
+// char *reverse_dns_lookup(char *ip_addr) {
+//     struct sockaddr_in temp_addr;
+//     socklen_t len;
+//     char buf[NI_MAXHOST], *ret_buf;
 
-    // Инициализация структуры sockaddr_in для хранения IP-адреса
-    temp_addr.sin_family = AF_INET;
-    temp_addr.sin_addr.s_addr = inet_addr(ip_addr);
-    len = sizeof(struct sockaddr_in);
+//     // Инициализация структуры sockaddr_in для хранения IP-адреса
+//     temp_addr.sin_family = AF_INET;
+//     temp_addr.sin_addr.s_addr = inet_addr(ip_addr);
+//     len = sizeof(struct sockaddr_in);
 
-    // Выполнение обратного разрешения с помощью getnameinfo
-    if (getnameinfo((struct sockaddr *)&temp_addr, len, buf, sizeof(buf), NULL, 0, NI_NAMEREQD)) {
-        printf("Could not resolve reverse lookup of hostname\n");
-        return NULL;
-    }
+//     // Выполнение обратного разрешения с помощью getnameinfo
+//     if (getnameinfo((struct sockaddr *)&temp_addr, len, buf, sizeof(buf), NULL, 0, NI_NAMEREQD)) {
+//         printf("Could not resolve reverse lookup of hostname\n");
+//         return NULL;
+//     }
 
-    // Копирование результата в новый буфер и возвращение его
-    ret_buf = (char *)malloc((strlen(buf) + 1) * sizeof(char));
-    strcpy(ret_buf, buf);
-    return ret_buf;
-}
+//     // Копирование результата в новый буфер и возвращение его
+//     ret_buf = (char *)malloc((strlen(buf) + 1) * sizeof(char));
+//     strcpy(ret_buf, buf);
+//     return ret_buf;
+// }
 
 void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_dom, char *ping_ip, char *rev_host)
 {
@@ -184,7 +201,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_dom, c
             {
                 // Получаем заголовок ICMP
                 struct icmphdr *recv_hdr = (struct icmphdr *)buffer;
-                if (!(recv_hdr->type == 0 && recv_hdr->code == 0))
+                if ((recv_hdr->type == 0 && recv_hdr->code == 0))
                 {
                     printf("Error... Packet received with ICMP type %d code %d\n", recv_hdr->type, recv_hdr->code);
                 }
@@ -212,33 +229,29 @@ int main(int argc, char *argv[])
     int addrlen = sizeof(addr_con);
     char net_buf[NI_MAXHOST];
 
-    if (argc != 2) {
-        printf("\nFormat %s <address>\n", argv[0]);
-        return 0;
+    if (argc != 2)
+    {
+        fprintf(stderr, "%s\n",  error_message);
+        exit(EXIT_FAILURE);
     }
 
     ip_addr = dns_lookup(argv[1], &addr_con);
-    if (ip_addr == NULL) {
-        printf("\nDNS lookup failed! Could not resolve hostname!\n");
-        return 0;
+
+    if (ip_addr == NULL)
+    {
+        fprintf(stderr, "ping: cannot resolve %s: Unknown host\n", argv[1]);
+        exit(EXIT_FAILURE);
     }
 
-    reverse_hostname = reverse_dns_lookup(ip_addr);
-    printf("\nTrying to connect to '%s' IP: %s\n", argv[1], ip_addr);
-    printf("\nReverse Lookup domain: %s\n", reverse_hostname);
-
-    // Create a raw socket
     sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-    if (sockfd < 0) {
-        printf("\nSocket file descriptor not received!\n");
-        return 0;
-    } else {
-        printf("\nSocket file descriptor %d received\n", sockfd);
+    if (sockfd < 0)
+    {
+        fprintf(stderr, "Socket file descriptor not received!\n");
+        exit(EXIT_FAILURE);
     }
 
-    signal(SIGINT, intHandler); // Catching interrupt
-
-    // Send pings continuously
+    signal(SIGINT, intHandler); 
+    
     send_ping(sockfd, &addr_con, reverse_hostname, ip_addr, argv[1]);
 
     return 0;
