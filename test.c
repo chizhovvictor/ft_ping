@@ -11,6 +11,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <math.h>
 
 char* error_message = "usage: ping [-AaDdfnoQqRrv] [-c count] [-G sweepmaxsize]\n"
                       "            [-g sweepminsize] [-h sweepincrsize] [-i wait]\n"
@@ -47,11 +48,20 @@ struct icmphdr {
     } un;
 };
 
+struct ping_stats {
+    double min;
+    double avg;
+    double max;
+    double stddev;
+    double value[];
+};
 
 struct ping_pkt {
     struct icmphdr hdr;  // Заголовок ICMP-пакета
     char msg[PING_PKT_S - sizeof(struct icmphdr)]; // Данные пакета
 };
+
+
 
 
 unsigned short checksum(void *b, int len) {
@@ -97,18 +107,40 @@ void intHandler(int dummy) {
     pingloop = 0; 
 }
 
+// Функция для вычисления статистики
+void put_stats(long double time, struct ping_stats *ping_stat) {
+    if (ping_stat->min > time)
+        ping_stat->min = time;
+    if (ping_stat->max < time)
+        ping_stat->max = time;
+    ping_stat->avg += time;
+
+
+
+    
+}
+
+// Функция для вычисления стандартного отклонения
+void get_stddev(struct ping_stats *ping_stat, int count) {
+    ping_stat->avg = ping_stat->avg / count;
+
+    for (int i = 0; i < count; i++) {
+        ping_stat->stddev += pow(ping_stat->value[i] - ping_stat->avg, 2);
+    }
+
+    ping_stat->stddev = sqrt(ping_stat->stddev / count);
+
+}
+
 void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *rev_host)
 {
     int ttl_val = 64;
     int msg_count = 0;
     int msg_received_count = 0;
     char buffer[128];
-    struct timespec tfs, time_start, time_end, tfe;
+    struct timespec time_start, time_end;
     int flag;
-    long double rtt_msec = 0, total_msec = 0;
-
-    // используется для получения текущего значения времени на монотонных часах.
-    clock_gettime(CLOCK_MONOTONIC, &tfs);
+    long double rtt_msec = 0;
 
     /*
         Функция setsockopt используется для настройки параметров сокета. Она позволяет установить
@@ -131,10 +163,17 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
     setsockopt(ping_sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv_out, sizeof tv_out);
 
     struct ping_pkt pckt;
+    struct ping_stats stats;
+
+    stats.min = 100000;
+    stats.max = 0;
+    stats.avg = 0;
+    stats.stddev = 0;
 
     struct sockaddr_in r_addr; // Структура для хранения адреса получателя
     socklen_t addr_len = sizeof(r_addr);
 
+    int j = 0;
     while (pingloop)
     {
         flag = 1;
@@ -185,17 +224,20 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
                 else
                 {
                     printf("%d bytes from %s: icmp_seq = %d ttl = %d time = %.3Lf ms\n", PING_PKT_S, ping_ip, msg_count, ttl_val, rtt_msec);
+                    put_stats(rtt_msec, &stats);
+                    stats.value[j] = rtt_msec;
                     msg_received_count++;
+                    j++;
                 }
             }
         }
     }
-    clock_gettime(CLOCK_MONOTONIC, &tfe);
-    double timeElapsed = ((double)(tfe.tv_nsec - tfs.tv_nsec)) / 1000000;
-    total_msec = (tfe.tv_sec - tfs.tv_sec) * 1000 + timeElapsed;
-
+    get_stddev(&stats, msg_count);
     printf("\n--- %s ping statistics ---\n", ping_ip);
-    printf("%d packets transmitted, %d packets received, %.1f%% packet loss Total time: %Lf ms.\n\n", msg_count, msg_received_count, ((msg_count - msg_received_count) / (double)msg_count) * 100, total_msec);
+    printf("%d packets transmitted, %d packets received, %.1f%% packet loss\n", msg_count, msg_received_count, ((msg_count - msg_received_count) / (double)msg_count) * 100);
+    printf("round-trip min/avg/max/stddev = %.3f/%.3f/%.3f/%.3f ms\n", stats.min, stats.avg, stats.max, stats.stddev);
+    close(ping_sockfd);
+
 }
 
 int main(int argc, char *argv[])
