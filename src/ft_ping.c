@@ -162,6 +162,7 @@ int main(int argc, char *argv[])
     signal(SIGINT, intHandler); 
     
     send_ping(sockfd, &addr_con, ip_addr, argv[1]);
-
+    // free(ip_addr);
+    // system("leaks ft_ping");
     return 0;
 }
