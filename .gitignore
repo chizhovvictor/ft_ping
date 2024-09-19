@@ -1,0 +1,6 @@
+.vscode/
+.DS_Store
+.idea/
+*.o
+/obj
+ft_ping
