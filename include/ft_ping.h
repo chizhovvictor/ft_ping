@@ -11,6 +11,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <math.h>
 
 #define PING_PKT_S 64
 #define PORT_NO 0
@@ -36,8 +37,17 @@ struct ping_pkt {
     char msg[PING_PKT_S - sizeof(struct icmphdr)]; // Данные пакета
 };
 
+struct ping_stats {
+    double min;
+    double avg;
+    double max;
+    double stddev;
+    double value[];
+};
+
 unsigned short checksum(void *b, int len);
 char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con);
-char *reverse_dns_lookup(char *ip_addr);
 void intHandler(int dummy);
-void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_dom, char *ping_ip, char *rev_host);
+void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *rev_host);
+void put_stats(long double time, struct ping_stats *ping_stat);
+void get_stddev(struct ping_stats *ping_stat, int count);

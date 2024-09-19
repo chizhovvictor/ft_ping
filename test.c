@@ -113,11 +113,7 @@ void put_stats(long double time, struct ping_stats *ping_stat) {
         ping_stat->min = time;
     if (ping_stat->max < time)
         ping_stat->max = time;
-    ping_stat->avg += time;
-
-
-
-    
+    ping_stat->avg += time;    
 }
 
 // Функция для вычисления стандартного отклонения

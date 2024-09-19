@@ -1,6 +1,5 @@
 #include "../include/ft_ping.h"
 
-
 /*
 
 Контрольная сумма используется для проверки целостности данных при их передаче по сети. 
@@ -8,9 +7,6 @@
 контрольная сумма включается в заголовок пакета. Когда получатель получает этот пакет, 
 он снова вычисляет контрольную сумму для полученных данных. Если обе контрольные суммы 
 совпадают, значит, данные не были искажены при передаче.
-
-Этот алгоритм используется, например, для протоколов ICMP (в утилитах ping), 
-TCP и UDP для проверки целостности пакетов.
 
 */
 unsigned short checksum(void *b, int len) {
@@ -32,11 +28,8 @@ unsigned short checksum(void *b, int len) {
 }
 
 
-
 // Функция для преобразования доменного имени в IP-адрес
-
 char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
-    printf("\nResolving DNS...\n");
     struct hostent *host_entity;
     char *ip = (char *)malloc(NI_MAXHOST * sizeof(char));
 
@@ -57,25 +50,23 @@ void intHandler(int dummy) {
     pingloop = 0; 
 }
 
-// Функция для преобразования IP-адреса в доменное имя
-char *reverse_dns_lookup(char *ip_addr) {
-    struct sockaddr_in temp_addr;
-    socklen_t len;
-    char buf[NI_MAXHOST], *ret_buf;
+// Функция для вычисления статистики
+void put_stats(long double time, struct ping_stats *ping_stat) {
+    if (ping_stat->min > time)
+        ping_stat->min = time;
+    if (ping_stat->max < time)
+        ping_stat->max = time;
+    ping_stat->avg += time;    
+}
 
-    // Инициализация структуры sockaddr_in для хранения IP-адреса
-    temp_addr.sin_family = AF_INET;
-    temp_addr.sin_addr.s_addr = inet_addr(ip_addr);
-    len = sizeof(struct sockaddr_in);
+// Функция для вычисления стандартного отклонения
+void get_stddev(struct ping_stats *ping_stat, int count) {
+    ping_stat->avg = ping_stat->avg / count;
 
-    // Выполнение обратного разрешения с помощью getnameinfo
-    if (getnameinfo((struct sockaddr *)&temp_addr, len, buf, sizeof(buf), NULL, 0, NI_NAMEREQD)) {
-        printf("Could not resolve reverse lookup of hostname\n");
-        return NULL;
+    for (int i = 0; i < count; i++) {
+        ping_stat->stddev += pow(ping_stat->value[i] - ping_stat->avg, 2);
     }
 
-    // Копирование результата в новый буфер и возвращение его
-    ret_buf = (char *)malloc((strlen(buf) + 1) * sizeof(char));
-    strcpy(ret_buf, buf);
-    return ret_buf;
+    ping_stat->stddev = sqrt(ping_stat->stddev / count);
+
 }
