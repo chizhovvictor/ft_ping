@@ -97,30 +97,7 @@ void intHandler(int dummy) {
     pingloop = 0; 
 }
 
-// Функция для преобразования IP-адреса в доменное имя
-// char *reverse_dns_lookup(char *ip_addr) {
-//     struct sockaddr_in temp_addr;
-//     socklen_t len;
-//     char buf[NI_MAXHOST], *ret_buf;
-
-//     // Инициализация структуры sockaddr_in для хранения IP-адреса
-//     temp_addr.sin_family = AF_INET;
-//     temp_addr.sin_addr.s_addr = inet_addr(ip_addr);
-//     len = sizeof(struct sockaddr_in);
-
-//     // Выполнение обратного разрешения с помощью getnameinfo
-//     if (getnameinfo((struct sockaddr *)&temp_addr, len, buf, sizeof(buf), NULL, 0, NI_NAMEREQD)) {
-//         printf("Could not resolve reverse lookup of hostname\n");
-//         return NULL;
-//     }
-
-//     // Копирование результата в новый буфер и возвращение его
-//     ret_buf = (char *)malloc((strlen(buf) + 1) * sizeof(char));
-//     strcpy(ret_buf, buf);
-//     return ret_buf;
-// }
-
-void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_dom, char *ping_ip, char *rev_host)
+void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *rev_host)
 {
     int ttl_val = 64;
     int msg_count = 0;
@@ -140,11 +117,10 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_dom, c
 
     if (setsockopt(ping_sockfd, IPPROTO_IP, IP_TTL, &ttl_val, sizeof(ttl_val)) != 0)
     {
-        printf("\nSetting socket options to TTL failed!\n");
+        fprintf(stderr, "Setting socket options to TTL failed!\n");
         return;
     }
-    else
-        printf("\nSocket set to TTL...\n");
+
 
     // структура для хранения времени отправки пакета
     struct timeval tv_out;
@@ -171,8 +147,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_dom, c
         for (i = 0; i < sizeof(pckt.msg) - 1; i++)
             pckt.msg[i] = i + '0'; // Заполняем пакет данными
 
-        pckt.msg[i] = 0;                                   // Завершаем строку нулем
-        pckt.hdr.un.echo.sequence = msg_count++;           // Увеличиваем счетчик пакетов
+        pckt.msg[i] = 0;                                   // Завершаем строку нулем           // Увеличиваем счетчик пакетов
         pckt.hdr.checksum = checksum(&pckt, sizeof(pckt)); // Вычисляем контрольную сумму пакета
         usleep(1000000);                                   // Задержка в 1 секунду перед отправкой следующего пакета чтобы не перегружать сеть
 
@@ -181,44 +156,46 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_dom, c
         // Отправляем пакет
         if (sendto(ping_sockfd, &pckt, sizeof(pckt), 0, (struct sockaddr *)ping_addr, sizeof(*ping_addr)) <= 0)
         {
-            printf("\nPacket Sending Failed!\n");
+            fprintf(stderr, "ping: sendto: No route to host\n");
             flag = 0;
         }
 
-        // Получаем пакет
+        if (pingloop == 0)
+            break;
+        pckt.hdr.un.echo.sequence = msg_count++;
         if (recvfrom(ping_sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&r_addr, &addr_len) <= 0 && msg_count > 1)
         {
-            printf("\nPacket receive failed!\n");
+            fprintf(stderr, "Request timeout for icmp_seq %d\n", msg_count);
         }
         else
         {
             clock_gettime(CLOCK_MONOTONIC, &time_end);                                          // Получаем время получения пакета
-            double timeElapsed = ((double)(time_end.tv_nsec - time_start.tv_nsec)) / 1000000.0; // Вычисляем время прохождения пакета
-            rtt_msec = (time_end.tv_sec - time_start.tv_sec) * 1000.0 + timeElapsed;            // Хранит Round-Trip Time (RTT), который является временем, необходимым для пакета, чтобы отправиться к целевому хосту и вернуться обратно
+            double timeElapsed = ((double)(time_end.tv_nsec - time_start.tv_nsec)) / 1000000; // Вычисляем время прохождения пакета
+            rtt_msec = (time_end.tv_sec - time_start.tv_sec) * 1000 + timeElapsed;            // Хранит Round-Trip Time (RTT), который является временем, необходимым для пакета, чтобы отправиться к целевому хосту и вернуться обратно
 
             // Если пакет получен
             if (flag)
             {
                 // Получаем заголовок ICMP
                 struct icmphdr *recv_hdr = (struct icmphdr *)buffer;
-                if ((recv_hdr->type == 0 && recv_hdr->code == 0))
+                if (recv_hdr->type == 0 && recv_hdr->code == 0)
                 {
                     printf("Error... Packet received with ICMP type %d code %d\n", recv_hdr->type, recv_hdr->code);
                 }
                 else
                 {
-                    printf("%d bytes from %s (h: %s) (ip: %s) msg_seq = %d ttl = %d rtt = %Lf ms.\n", PING_PKT_S, ping_dom, rev_host, ping_ip, msg_count, ttl_val, rtt_msec);
+                    printf("%d bytes from %s: icmp_seq = %d ttl = %d time = %.3Lf ms\n", PING_PKT_S, ping_ip, msg_count, ttl_val, rtt_msec);
                     msg_received_count++;
                 }
             }
         }
     }
     clock_gettime(CLOCK_MONOTONIC, &tfe);
-    double timeElapsed = ((double)(tfe.tv_nsec - tfs.tv_nsec)) / 1000000.0;
-    total_msec = (tfe.tv_sec - tfs.tv_sec) * 1000.0 + timeElapsed;
+    double timeElapsed = ((double)(tfe.tv_nsec - tfs.tv_nsec)) / 1000000;
+    total_msec = (tfe.tv_sec - tfs.tv_sec) * 1000 + timeElapsed;
 
-    printf("\n=== %s ping statistics ===\n", ping_ip);
-    printf("%d packets sent, %d packets received, %f%% packet loss. Total time: %Lf ms.\n\n", msg_count, msg_received_count, ((msg_count - msg_received_count) / (double)msg_count) * 100.0, total_msec);
+    printf("\n--- %s ping statistics ---\n", ping_ip);
+    printf("%d packets transmitted, %d packets received, %.1f%% packet loss Total time: %Lf ms.\n\n", msg_count, msg_received_count, ((msg_count - msg_received_count) / (double)msg_count) * 100, total_msec);
 }
 
 int main(int argc, char *argv[])
@@ -252,7 +229,14 @@ int main(int argc, char *argv[])
 
     signal(SIGINT, intHandler); 
     
-    send_ping(sockfd, &addr_con, reverse_hostname, ip_addr, argv[1]);
+    send_ping(sockfd, &addr_con, ip_addr, argv[1]);
 
     return 0;
 }
+
+// разобраться с таймом
+// разобраться как сделать чтобы при нажатии Ctrl+C не отправлялся пакет или не учитывался
+// разобраться с таймаутом
+// разобраться с выводом ошибок
+// разобраться с выводом статистики
+
