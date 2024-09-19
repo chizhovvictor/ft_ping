@@ -1,6 +1,6 @@
 #include "../include/ft_ping.h"
 
-void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *rev_host)
+void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *host)
 {
     int ttl_val = 64;
     int msg_count = 0;
@@ -20,6 +20,9 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
         fprintf(stderr, "Setting socket options to TTL failed!\n");
         return;
     }
+
+    int packet_size = PING_PKT_S - sizeof(struct icmphdr);
+    printf("PING %s (%s): %d data bytes\n", host, ping_ip, packet_size);
 
 
     // структура для хранения времени отправки пакета
@@ -49,7 +52,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
         pckt.hdr.type = ICMP_ECHO;
         pckt.hdr.un.echo.id = getpid(); // Получаем идентификатор процесса (при отправке пакетов с разных процессов)
 
-        int i;
+        unsigned long i;
 
         for (i = 0; i < sizeof(pckt.msg) - 1; i++)
             pckt.msg[i] = i + '0'; // Заполняем пакет данными
@@ -69,6 +72,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
 
         if (pingloop == 0)
             break;
+        
         pckt.hdr.un.echo.sequence = msg_count++;
         if (recvfrom(ping_sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&r_addr, &addr_len) <= 0 && msg_count > 1)
         {
@@ -91,7 +95,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
                 }
                 else
                 {
-                    printf("%d bytes from %s: icmp_seq = %d ttl = %d time = %.3Lf ms\n", PING_PKT_S, ping_ip, msg_count, ttl_val, rtt_msec);
+                    printf("%d bytes from %s: icmp_seq = %d ttl = %d time = %.3Lf ms\n", PING_PKT_S, ping_ip, msg_count - 1, ttl_val, rtt_msec);
                     put_stats(rtt_msec, &stats);
                     stats.value[j] = rtt_msec;
                     msg_received_count++;
@@ -101,8 +105,8 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
         }
     }
     get_stddev(&stats, msg_count);
-    printf("\n--- %s ping statistics ---\n", ping_ip);
-    printf("%d packets transmitted, %d packets received, %.1f%% packet loss\n", msg_count, msg_received_count, ((msg_count - msg_received_count) / (double)msg_count) * 100);
+    printf("\n--- %s ping statistics ---\n", host);
+    printf("%d packets transmitted, %d packets received, %d%% packet loss\n", msg_count, msg_received_count, ((msg_count - msg_received_count) / msg_count) * 100);
     printf("round-trip min/avg/max/stddev = %.3f/%.3f/%.3f/%.3f ms\n", stats.min, stats.avg, stats.max, stats.stddev);
     close(ping_sockfd);
 
@@ -111,10 +115,10 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
 int main(int argc, char *argv[])
 {
     int sockfd;
-    char *ip_addr, *reverse_hostname;
+    char *ip_addr;
     struct sockaddr_in addr_con;
-    int addrlen = sizeof(addr_con);
-    char net_buf[NI_MAXHOST];
+
+    pingloop = 1;
 
     if (argc != 2)
     {

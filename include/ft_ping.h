@@ -15,7 +15,8 @@
 
 #define PING_PKT_S 64
 #define PORT_NO 0
-int pingloop = 1;
+
+int pingloop;
 
 //для макоса (потом закоментить и протестить на линуксе)
 struct icmphdr {
@@ -47,7 +48,7 @@ struct ping_stats {
 
 unsigned short checksum(void *b, int len);
 char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con);
-void intHandler(int dummy);
-void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *rev_host);
+void intHandler();
+void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *host);
 void put_stats(long double time, struct ping_stats *ping_stat);
 void get_stddev(struct ping_stats *ping_stat, int count);
