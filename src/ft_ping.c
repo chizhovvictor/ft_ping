@@ -30,13 +30,8 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
     int msg_received_count = 0;
     char buffer[128];
     struct timespec time_start, time_end;
-    int flag;
+    int flag, print_statistic = 1;
     long double rtt_msec = 0;
-
-    /*
-        Функция setsockopt используется для настройки параметров сокета. Она позволяет установить
-        различные опции, которые определяют поведение сокета.
-    */
 
     if (setsockopt(ping_sockfd, IPPROTO_IP, IP_TTL, &ttl_val, sizeof(ttl_val)) != 0)
     {
@@ -48,12 +43,10 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
     printf("PING %s (%s): %d data bytes\n", host, ping_ip, packet_size);
 
 
-    // структура для хранения времени отправки пакета
     struct timeval tv_out;
-    tv_out.tv_sec = 1; // Устанавливаем таймаут в 1 секунду
+    tv_out.tv_sec = 1;
     tv_out.tv_usec = 0;
 
-    // Устанавливаем таймаут для получения пакета, чтобы программа не висла в ожидании, а возвращала ошибку
     setsockopt(ping_sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv_out, sizeof tv_out);
 
     struct ping_pkt pckt;
@@ -64,29 +57,28 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
     stats.avg = 0;
     stats.stddev = 0;
 
-    struct sockaddr_in r_addr; // Структура для хранения адреса получателя
+    struct sockaddr_in r_addr;
     socklen_t addr_len = sizeof(r_addr);
 
     int j = 0;
     while (pingloop)
     {
         flag = 1;
-        bzero(&pckt, sizeof(pckt)); // Заполняем пакет нулями
+        bzero(&pckt, sizeof(pckt));
         pckt.hdr.type = ICMP_ECHO;
-        pckt.hdr.un.echo.id = getpid(); // Получаем идентификатор процесса (при отправке пакетов с разных процессов)
+        pckt.hdr.un.echo.id = getpid();
 
         unsigned long i;
 
         for (i = 0; i < sizeof(pckt.msg) - 1; i++)
-            pckt.msg[i] = i + '0'; // Заполняем пакет данными
+            pckt.msg[i] = i + '0';
 
-        pckt.msg[i] = 0;                                   // Завершаем строку нулем           // Увеличиваем счетчик пакетов
-        pckt.hdr.checksum = checksum(&pckt, sizeof(pckt)); // Вычисляем контрольную сумму пакета
-        usleep(1000000);                                   // Задержка в 1 секунду перед отправкой следующего пакета чтобы не перегружать сеть
+        pckt.msg[i] = 0;
+        pckt.hdr.checksum = checksum(&pckt, sizeof(pckt));
+        usleep(1000000);
 
-        clock_gettime(CLOCK_MONOTONIC, &time_start); // Получаем текущее время
+        clock_gettime(CLOCK_MONOTONIC, &time_start);
 
-        // Отправляем пакет
         if (sendto(ping_sockfd, &pckt, sizeof(pckt), 0, (struct sockaddr *)ping_addr, sizeof(*ping_addr)) <= 0)
         {
             fprintf(stderr, "ping: sendto: No route to host\n");
@@ -97,25 +89,20 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
             break;
         
         pckt.hdr.un.echo.sequence = msg_count++;
-        if (recvfrom(ping_sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&r_addr, &addr_len) <= 0 && msg_count > 1)
+        if (recvfrom(ping_sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&r_addr, &addr_len) > 0)
         {
-            fprintf(stderr, "Request timeout for icmp_seq %d\n", msg_count);
-        }
-        else
-        {
-            clock_gettime(CLOCK_MONOTONIC, &time_end);                                          // Получаем время получения пакета
-            double timeElapsed = ((double)(time_end.tv_nsec - time_start.tv_nsec)) / 1000000; // Вычисляем время прохождения пакета
-            rtt_msec = (time_end.tv_sec - time_start.tv_sec) * 1000 + timeElapsed;            // Хранит Round-Trip Time (RTT), который является временем, необходимым для пакета, чтобы отправиться к целевому хосту и вернуться обратно
+            clock_gettime(CLOCK_MONOTONIC, &time_end);
+            double timeElapsed = ((double)(time_end.tv_nsec - time_start.tv_nsec)) / 1000000;
+            rtt_msec = (time_end.tv_sec - time_start.tv_sec) * 1000 + timeElapsed;
 
-            // Если пакет получен
             if (flag)
             {
-                // Получаем заголовок ICMP
                 struct icmphdr *recv_hdr = (struct icmphdr *)buffer;
                 if (recv_hdr->type == 0 && recv_hdr->code == 0)
-                {
-                    fprintf(stderr, "Error... Packet received with ICMP type %d code %d\n", recv_hdr->type, recv_hdr->code);
-                }
+		{
+		    printf("statistic = %d\n", print_statistic);
+                    print_statistic = 0;
+		}
                 else
                 {
                     printf("%d bytes from %s: icmp_seq = %d ttl = %d time = %.3Lf ms\n", PING_PKT_S, ping_ip, msg_count - 1, ttl_val, rtt_msec);
@@ -126,11 +113,15 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
                 }
             }
         }
+	else
+	    print_statistic = 0;
     }
     get_stddev(&stats, msg_count);
-    printf("\n--- %s ping statistics ---\n", host);
+    printf("--- %s ping statistics ---\n", host);
     printf("%d packets transmitted, %d packets received, %d%% packet loss\n", msg_count, msg_received_count, ((msg_count - msg_received_count) / msg_count) * 100);
-    printf("round-trip min/avg/max/stddev = %.3f/%.3f/%.3f/%.3f ms\n", stats.min, stats.avg, stats.max, stats.stddev);
+    
+    if (print_statistic)
+	printf("round-trip min/avg/max/stddev = %.3f/%.3f/%.3f/%.3f ms\n", stats.min, stats.avg, stats.max, stats.stddev);
 
 }
 
@@ -168,7 +159,6 @@ int main(int argc, char *argv[])
     send_ping(sockfd, &addr_con, ip_addr, argv[1]);
     close(sockfd);
     free(ip_addr);
-    // system("leaks ft_ping");
 
     return 0;
 }
