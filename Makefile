@@ -8,7 +8,7 @@ HEADER = ./include/ft_ping.h
 
 OBJS = $(SRCS:.c=.o)
 
-CFLAGS = -Werror -Wextra -Wall #-fsanitize=address -g
+CFLAGS = -Werror -Wextra -Wall -g -fsanitize=address
 
 all: $(NAME)
 

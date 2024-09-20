@@ -109,7 +109,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
                 struct icmphdr *recv_hdr = (struct icmphdr *)buffer;
                 if (recv_hdr->type == 0 && recv_hdr->code == 0)
                 {
-                    printf("Error... Packet received with ICMP type %d code %d\n", recv_hdr->type, recv_hdr->code);
+                    fprintf(stderr, "Error... Packet received with ICMP type %d code %d\n", recv_hdr->type, recv_hdr->code);
                 }
                 else
                 {
@@ -126,7 +126,6 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
     printf("\n--- %s ping statistics ---\n", host);
     printf("%d packets transmitted, %d packets received, %d%% packet loss\n", msg_count, msg_received_count, ((msg_count - msg_received_count) / msg_count) * 100);
     printf("round-trip min/avg/max/stddev = %.3f/%.3f/%.3f/%.3f ms\n", stats.min, stats.avg, stats.max, stats.stddev);
-    close(ping_sockfd);
 
 }
 
@@ -162,7 +161,9 @@ int main(int argc, char *argv[])
     signal(SIGINT, intHandler); 
     
     send_ping(sockfd, &addr_con, ip_addr, argv[1]);
-    // free(ip_addr);
+    close(sockfd);
+    free(ip_addr);
     // system("leaks ft_ping");
+
     return 0;
 }
