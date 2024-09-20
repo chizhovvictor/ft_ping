@@ -18,7 +18,7 @@ CC = cc
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(NAME) : $(OBJS)
-	$(CC) -I $(HEADER) $(CFLAGS) $(OBJS) -o $(NAME)
+	$(CC) -I $(HEADER) $(CFLAGS) $(OBJS) -o $(NAME) -lm
 
 
 clean:

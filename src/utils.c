@@ -45,11 +45,6 @@ char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
     return ip;
 }
 
-// функция для прерывания бесконечного цикла пинга по нажатию Ctrl+C
-void intHandler() { 
-    pingloop = 0; 
-}
-
 // Функция для вычисления статистики
 void put_stats(long double time, struct ping_stats *ping_stat) {
     if (ping_stat->min > time)

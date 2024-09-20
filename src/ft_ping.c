@@ -1,5 +1,7 @@
 #include "../include/ft_ping.h"
 
+int pingloop;
+
 char* error_message = "usage: ping [-AaDdfnoQqRrv] [-c count] [-G sweepmaxsize]\n"
                       "            [-g sweepminsize] [-h sweepincrsize] [-i wait]\n"
                       "            [-l preload] [-M mask | time] [-m ttl] [-p pattern]\n"
@@ -16,7 +18,10 @@ char* error_message = "usage: ping [-AaDdfnoQqRrv] [-c count] [-G sweepmaxsize]\
                       "            --apple-connect      # call connect(2) in the socket\n"
                       "            --apple-time         # display current time\n";
 
-    
+
+void intHandler() {
+    pingloop = 0;
+}    
 
 void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *host)
 {
