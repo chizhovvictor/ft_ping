@@ -97,19 +97,24 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
 
             if (flag)
             {
-                struct icmphdr *recv_hdr = (struct icmphdr *)buffer;
+                // struct icmphdr *recv_hdr = (struct icmphdr *)buffer;
+
+                struct iphdr *ip_header = (struct iphdr *) buffer;
+                struct icmphdr *recv_hdr = (struct icmphdr *) (buffer + ip_header->ihl * 4);
+
                 if (recv_hdr->type == 0 && recv_hdr->code == 0)
                 {
-                    printf("statistic = %d\n", print_statistic);
-                    print_statistic = 0;
-                }
-                else    
-                {
+                    
                     printf("%d bytes from %s: icmp_seq = %d ttl = %d time = %.3Lf ms\n", PING_PKT_S, ping_ip, msg_count - 1, ttl_val, rtt_msec);
                     put_stats(rtt_msec, &stats);
                     stats.value[j] = rtt_msec;
                     msg_received_count++;
                     j++;
+                }
+                else    
+                {
+                    printf("statistic = %d\n", print_statistic);
+                    print_statistic = 0;
                 }
             }
         }       
