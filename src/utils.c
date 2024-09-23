@@ -22,7 +22,8 @@ char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
     char *ip = (char *)malloc(NI_MAXHOST * sizeof(char));
 
     if ((host_entity = gethostbyname(addr_host)) == NULL) {
-        return NULL;
+        free(ip);
+	return NULL;
     }
 
     strcpy(ip, inet_ntoa(*(struct in_addr *)host_entity->h_addr));

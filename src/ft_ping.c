@@ -1,23 +1,44 @@
 #include "../include/ft_ping.h"
 
+
+char *question_msg = 	"Usage: ping [OPTION...] HOST ...\n"
+			"Send ICMP ECHO_REQUEST packets to network hosts.\n\n"
+			" Options controlling ICMP request types:\n"
+			"      --address              send ICMP_ADDRESS packets (root only)\n"
+			"      --echo                 send ICMP_ECHO packets (default)\n"
+			"      --mask                 same as --address\n"
+			"      --timestamp            send ICMP_TIMESTAMP packets\n"
+			"  -t, --type=TYPE            send TYPE packets\n\n"
+			" Options valid for all request types:\n\n"
+			"  -c, --count=NUMBER         stop after sending NUMBER packets\n"
+			"  -d, --debug                set the SO_DEBUG option\n"
+			"  -i, --interval=NUMBER      wait NUMBER seconds between sending each packet\n"
+			"  -n, --numeric              do not resolve host addresses\n"
+			"  -r, --ignore-routing       send directly to a host on an attached network\n"
+			"      --ttl=N                specify N as time-to-live\n"
+			"  -T, --tos=NUM              set type of service (TOS) to NUM\n"
+			"  -v, --verbose              verbose output\n"
+			"  -w, --timeout=N            stop after N seconds\n"
+			"  -W, --linger=N             number of seconds to wait for response\n\n"
+			" Options valid for --echo requests:\n\n"
+			"  -f, --flood                flood ping (root only)\n"
+			"      --ip-timestamp=FLAG    IP timestamp of type FLAG, which is one of\n"
+			"                             \"tsonly\" and \"tsaddr\"\n"
+			"  -l, --preload=NUMBER       send NUMBER packets as fast as possible before\n"
+			"                             falling into normal mode of behavior (root only)\n"
+			"  -p, --pattern=PATTERN      fill ICMP packet with given pattern (hex)\n"
+			"  -q, --quiet                quiet output\n"
+			"  -R, --route                record route\n"
+			"  -s, --size=NUMBER          send NUMBER data octets\n\n"
+			"  -?, --help                 give this help list\n"
+			"      --usage                give a short usage message\n"
+			"  -V, --version              print program version\n\n"
+			"Mandatory or optional arguments to long options are also mandatory or optional\n"
+			"for any corresponding short options.\n\n"
+			"Options marked with (root only) are available only to superuser.\n\n"
+			"Report bugs to <bug-inetutils@gnu.org>.\n";
+
 int pingloop;
-
-char* error_message = "usage: ping [-AaDdfnoQqRrv] [-c count] [-G sweepmaxsize]\n"
-                      "            [-g sweepminsize] [-h sweepincrsize] [-i wait]\n"
-                      "            [-l preload] [-M mask | time] [-m ttl] [-p pattern]\n"
-                      "            [-S src_addr] [-s packetsize] [-t timeout][-W waittime]\n"
-                      "            [-z tos] host\n"
-                      "       ping [-AaDdfLnoQqRrv] [-c count] [-I iface] [-i wait]\n"
-                      "            [-l preload] [-M mask | time] [-m ttl] [-p pattern] [-S src_addr]\n"
-                      "            [-s packetsize] [-T ttl] [-t timeout] [-W waittime]\n"
-                      "            [-z tos] mcast-group\n"
-                      "Apple specific options (to be specified before mcast-group or host like all options)\n"
-                      "            -b boundif           # bind the socket to the interface\n"
-                      "            -k traffic_class     # set traffic class socket option\n"
-                      "            -K net_service_type  # set traffic class socket options\n"
-                      "            --apple-connect      # call connect(2) in the socket\n"
-                      "            --apple-time         # display current time\n";
-
 
 void intHandler() {
     pingloop = 0;
@@ -25,7 +46,7 @@ void intHandler() {
 
 void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *host)
 {
-    int ttl_val = 64;
+    int ttl_val = 63;
     int msg_count = 0;
     int msg_received_count = 0;
     char buffer[128];
@@ -81,7 +102,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
 
         if (sendto(ping_sockfd, &pckt, sizeof(pckt), 0, (struct sockaddr *)ping_addr, sizeof(*ping_addr)) <= 0)
         {
-            fprintf(stderr, "ping: sendto: No route to host\n");
+            //fprintf(stderr, "ping: sendto: No route to host\n");
             flag = 0;
         }
 
@@ -102,8 +123,19 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
                 struct iphdr *ip_header = (struct iphdr *) buffer;
                 struct icmphdr *recv_hdr = (struct icmphdr *) (buffer + ip_header->ihl * 4);
 
-                if (recv_hdr->type == 0 && recv_hdr->code == 0)
+                if (recv_hdr->type == ICMP_ECHOREPLY && recv_hdr->code == 0)
                 {
+		    // check control sum
+		    
+		    //unsigned short received_checksum = recv_hdr->checksum;
+		    //recv_hdr->checksum = 0;
+		    //unsigned short calculated_checksum = checksum(recv_hdr, sizeof(*recv_hdr) + (ip_header->tot_len - ip_header->ihl * 4));
+
+		    //if (received_checksum != calculated_checksum)
+        	    //{
+            		//printf("Checksum mismatch: received %u, calculated %u\n", received_checksum, calculated_checksum);
+            		//continue;
+        	    //}
                     
                     printf("%d bytes from %s: icmp_seq = %d ttl = %d time = %.3Lf ms\n", PING_PKT_S, ping_ip, msg_count - 1, ttl_val, rtt_msec);
                     put_stats(rtt_msec, &stats);
@@ -123,7 +155,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
     }
     get_stddev(&stats, msg_count);
     printf("--- %s ping statistics ---\n", host);
-    printf("%d packets transmitted, %d packets received, %d%% packet loss\n", msg_count, msg_received_count, ((msg_count - msg_received_count) / msg_count) * 100);
+    printf("%d packets transmitted, %d packets received, %.0f%% packet loss\n", msg_count, msg_received_count, ((float)(msg_count - msg_received_count) / msg_count) * 100);
     
     if (print_statistic)
 	printf("round-trip min/avg/max/stddev = %.3f/%.3f/%.3f/%.3f ms\n", stats.min, stats.avg, stats.max, stats.stddev);
@@ -136,26 +168,47 @@ int main(int argc, char *argv[])
     char *ip_addr;
     struct sockaddr_in addr_con;
 
-    pingloop = 1;
+    int verbose_mode = 0;
+    int question_mode = 0;
 
-    if (argc != 2)
+    for (int i = 1; i < argc; i++)
     {
-        fprintf(stderr, "...\n");
-        exit(EXIT_FAILURE);
+	if (strcmp(argv[i], "-v") == 0)
+	    verbose_mode++;
+	else if (strcmp(argv[i], "-?") == 0)
+	    question_mode++;
     }
 
-    ip_addr = dns_lookup(argv[1], &addr_con);
+    if (question_mode > 0)
+    {
+	printf(question_msg);
+	return 0;
+    }
+
+    pingloop = 1;
+
+    if ((argc == 2 && verbose_mode > 0) || (argc > 2 && verbose_mode == 0) || argc > 3 || verbose_mode > 1)
+    {
+	fprintf(stderr, "ping: missing host operand\nTry 'ping --help' or 'ping --usage' for more information.\n");
+	exit(EXIT_FAILURE);
+    }
+
+    for (int i = 1; i < argc; i++)
+    	if (strcmp(argv[i], "-v") != 0)
+    	    ip_addr = dns_lookup(argv[i], &addr_con);
 
     if (ip_addr == NULL)
     {
-        fprintf(stderr, "ping: cannot resolve %s: Unknown host\n", argv[1]);
-        exit(EXIT_FAILURE);
+	fprintf(stderr, "ping: unknown host\n");
+	exit(EXIT_FAILURE);
     }
 
     sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (sockfd < 0)
     {
         fprintf(stderr, "Socket file descriptor not received!\n");
+	free(ip_addr);
+	close(sockfd);
         exit(EXIT_FAILURE);
     }
 
@@ -167,3 +220,7 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+
+//check control sum
+//create verbose mode

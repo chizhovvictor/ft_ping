@@ -18,18 +18,16 @@
 
 
 
-//для макоса (потом закоментить и протестить на линуксе)
-
 // struct icmphdr {
-//     uint8_t type;       // Тип ICMP-сообщения
-//     uint8_t code;       // Код ICMP-сообщения
-//     uint16_t checksum;  // Контрольная сумма
+//     uint8_t type;
+//     uint8_t code;
+//     uint16_t checksum;
 //     union {
 //         struct {
-//             uint16_t id;        // Идентификатор сообщения
-//             uint16_t sequence;  // Номер последовательности сообщения
+//             uint16_t id;
+//             uint16_t sequence;
 //         } echo;
-//         uint32_t gateway;       // Используется для Destination Unreachable
+//         uint32_t gateway;
 //     } un;
 // };
 
@@ -45,8 +43,8 @@
 
 
 struct ping_pkt {
-    struct icmphdr hdr;  // Заголовок ICMP-пакета
-    char msg[PING_PKT_S - sizeof(struct icmphdr)]; // Данные пакета
+    struct icmphdr hdr;
+    char msg[PING_PKT_S - sizeof(struct icmphdr)];
 };
 
 struct ping_stats {
