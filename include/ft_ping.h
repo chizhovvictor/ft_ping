@@ -19,7 +19,7 @@
 
 
 //для макоса (потом закоментить и протестить на линуксе)
-/*
+
 struct icmphdr {
     uint8_t type;       // Тип ICMP-сообщения
     uint8_t code;       // Код ICMP-сообщения
@@ -32,7 +32,7 @@ struct icmphdr {
         uint32_t gateway;       // Используется для Destination Unreachable
     } un;
 };
-*/
+
 
 struct ping_pkt {
     struct icmphdr hdr;  // Заголовок ICMP-пакета
