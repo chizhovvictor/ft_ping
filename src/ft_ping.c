@@ -98,6 +98,7 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
             if (flag)
             {
                 struct icmphdr *recv_hdr = (struct icmphdr *)buffer;
+		printf("type: %d, code: %d\n", recv_hdr->type, recv_hdr->code);
                 if (recv_hdr->type == 0 && recv_hdr->code == 0)
 		{
 		    printf("statistic = %d\n", print_statistic);
