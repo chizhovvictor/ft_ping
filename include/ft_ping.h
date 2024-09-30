@@ -58,6 +58,6 @@ struct ping_stats {
 unsigned short checksum(void *b, int len);
 char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con);
 void intHandler();
-void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *host);
+void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *host, int verbose_mode);
 void put_stats(long double time, struct ping_stats *ping_stat);
 void get_stddev(struct ping_stats *ping_stat, int count);

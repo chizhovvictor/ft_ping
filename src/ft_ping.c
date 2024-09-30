@@ -44,7 +44,7 @@ void intHandler() {
     pingloop = 0;
 }    
 
-void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *host)
+void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, char *host, int verbose_mode)
 {
     int ttl_val = 63;
     int msg_count = 0;
@@ -61,7 +61,11 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
     }
 
     int packet_size = PING_PKT_S - sizeof(struct icmphdr);
-    printf("PING %s (%s): %d data bytes\n", host, ping_ip, packet_size);
+
+    if (!verbose_mode)
+    	printf("PING %s (%s): %d data bytes\n", host, ping_ip, packet_size);
+    else
+	printf("PING %s (%s): %d data bytes, id 0x%04x = %d\n", host, ping_ip, packet_size, getpid(), getpid());
 
 
     struct timeval tv_out;
@@ -127,15 +131,18 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
                 {
 		    // check control sum
 		    
-		    //unsigned short received_checksum = recv_hdr->checksum;
-		    //recv_hdr->checksum = 0;
-		    //unsigned short calculated_checksum = checksum(recv_hdr, sizeof(*recv_hdr) + (ip_header->tot_len - ip_header->ihl * 4));
+		    unsigned short received_checksum = recv_hdr->checksum;
+		    recv_hdr->checksum = 0;
+		    int packet_size = sizeof(struct icmphdr) + sizeof(pckt.msg);
+		    unsigned short calculated_checksum = checksum(buffer + ip_header->ihl * 4, packet_size);
 
-		    //if (received_checksum != calculated_checksum)
-        	    //{
-            		//printf("Checksum mismatch: received %u, calculated %u\n", received_checksum, calculated_checksum);
-            		//continue;
-        	    //}
+		    //printf("checksum: %u, calculated: %u\n", received_checksum, calculated_checksum);
+
+		    if (received_checksum != calculated_checksum)
+        	    {
+            		printf("Checksum mismatch: received %u, calculated %u\n", received_checksum, calculated_checksum);
+            		break;
+        	    }
                     
                     printf("%d bytes from %s: icmp_seq = %d ttl = %d time = %.3Lf ms\n", PING_PKT_S, ping_ip, msg_count - 1, ttl_val, rtt_msec);
                     put_stats(rtt_msec, &stats);
@@ -145,7 +152,46 @@ void send_ping(int ping_sockfd, struct sockaddr_in *ping_addr, char *ping_ip, ch
                 }
                 else    
                 {
-                    printf("statistic = %d\n", print_statistic);
+		    if (!verbose_mode)
+			fprintf(stderr, "%d bytes from %s: Time to live exceeded\n", PING_PKT_S, ping_ip);
+		    else
+		    {
+			fprintf(stderr, "%d bytes from %s: Time to live exceeded\n", PING_PKT_S, ping_ip);
+			fprintf(stderr, "IP Hdr Dump:\n");
+			fprintf(stderr, " %d%d%02x %04x %04x %04x %04x %04x %04x %04x\n",
+        		    ip_header->version,
+			    ip_header->ihl,
+			    ip_header->tos,
+        		    ntohs(ip_header->tot_len),
+        		    ntohs(ip_header->id),
+        		    ip_header->frag_off,
+        		    ip_header->ttl,
+        		    ip_header->protocol,
+        		    ntohl(ip_header->saddr),
+			    ntohl(ip_header->daddr)
+			);
+			fprintf(stderr, "Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst     Data\n");
+			fprintf(stderr, " %d  %d  %02x %04x %04x   %d %04x  0%d  0%d %04x %s  %s\n",
+			    ip_header->version,
+			    ip_header->ihl,
+			    ip_header->tos,
+		 	    ntohs(ip_header->tot_len),
+			    ntohs(ip_header->id),
+			    (ntohs(ip_header->frag_off) & 0xE000) >> 13,
+			    ntohs(ip_header->frag_off) & 0x1FFF,
+			    ttl_val,
+			    ip_header->protocol,
+			    ip_header->check,
+			    inet_ntoa(*(struct in_addr *)&ip_header->saddr),
+			    ping_ip);
+			fprintf(stderr, "ICMP: type %d, code %d, size %ld, id 0x%04x, seq 0x%04x\n",
+			    pckt.hdr.type,
+			    pckt.hdr.code,
+			    sizeof(pckt),
+			    pckt.hdr.un.echo.id,
+			    pckt.hdr.un.echo.sequence
+    			);
+		    }
                     print_statistic = 0;
                 }
             }
@@ -214,13 +260,10 @@ int main(int argc, char *argv[])
 
     signal(SIGINT, intHandler); 
     
-    send_ping(sockfd, &addr_con, ip_addr, argv[1]);
+    send_ping(sockfd, &addr_con, ip_addr, argv[1], verbose_mode);
     close(sockfd);
     free(ip_addr);
 
     return 0;
 }
 
-
-//check control sum
-//create verbose mode
