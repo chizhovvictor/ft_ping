@@ -18,30 +18,6 @@
 
 
 
-// struct icmphdr {
-//     uint8_t type;
-//     uint8_t code;
-//     uint16_t checksum;
-//     union {
-//         struct {
-//             uint16_t id;
-//             uint16_t sequence;
-//         } echo;
-//         uint32_t gateway;
-//     } un;
-// };
-
-// struct iphdr {
-//     #if __BYTE_ORDER == __LITTLE_ENDIAN
-//     unsigned int ihl:4;
-//     unsigned int version:4;
-//     #elif __BYTE_ORDER == __BIG_ENDIAN
-//     unsigned int version:4;
-//     unsigned int ihl:4;
-//     #endif
-// };
-
-
 struct ping_pkt {
     struct icmphdr hdr;
     char msg[PING_PKT_S - sizeof(struct icmphdr)];

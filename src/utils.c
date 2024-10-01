@@ -52,3 +52,5 @@ void get_stddev(struct ping_stats *ping_stat, int count) {
     ping_stat->stddev = sqrt(ping_stat->stddev / count);
 
 }
+
+
