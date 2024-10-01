@@ -240,7 +240,15 @@ int main(int argc, char *argv[])
     {
         if (strcmp(argv[i], "-v") != 0)
         {
-            fqdn = argv[i];
+            if (argv[i][strlen(argv[i]) - 1] == '.')
+            {
+                int length = strlen(argv[i]);
+                argv[i][length - 1] = '\0';
+                fqdn = argv[i];
+            }
+            else
+                fqdn = argv[i];
+
             ip_addr = dns_lookup(argv[i], &addr_con);
         }
     }
