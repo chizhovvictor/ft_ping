@@ -16,14 +16,14 @@
 #define PING_PKT_S 64
 #define PORT_NO 0
 
-
-
-struct ping_pkt {
+struct ping_pkt
+{
     struct icmphdr hdr;
     char msg[PING_PKT_S - sizeof(struct icmphdr)];
 };
 
-struct ping_stats {
+struct ping_stats
+{
     double min;
     double avg;
     double max;

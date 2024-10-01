@@ -1,6 +1,7 @@
 #include "../include/ft_ping.h"
 
-unsigned short checksum(void *b, int len) {
+unsigned short checksum(void *b, int len)
+{
     unsigned short *buf = b;
     unsigned int sum = 0;
     unsigned short result;
@@ -17,13 +18,15 @@ unsigned short checksum(void *b, int len) {
     return result;
 }
 
-char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
+char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con)
+{
     struct hostent *host_entity;
     char *ip = (char *)malloc(NI_MAXHOST * sizeof(char));
 
-    if ((host_entity = gethostbyname(addr_host)) == NULL) {
+    if ((host_entity = gethostbyname(addr_host)) == NULL)
+    {
         free(ip);
-	return NULL;
+        return NULL;
     }
 
     strcpy(ip, inet_ntoa(*(struct in_addr *)host_entity->h_addr));
@@ -34,23 +37,23 @@ char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
     return ip;
 }
 
-void put_stats(long double time, struct ping_stats *ping_stat) {
+void put_stats(long double time, struct ping_stats *ping_stat)
+{
     if (ping_stat->min > time)
         ping_stat->min = time;
     if (ping_stat->max < time)
         ping_stat->max = time;
-    ping_stat->avg += time;    
+    ping_stat->avg += time;
 }
 
-void get_stddev(struct ping_stats *ping_stat, int count) {
+void get_stddev(struct ping_stats *ping_stat, int count)
+{
     ping_stat->avg = ping_stat->avg / count;
 
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         ping_stat->stddev += pow(ping_stat->value[i] - ping_stat->avg, 2);
     }
 
     ping_stat->stddev = sqrt(ping_stat->stddev / count);
-
 }
-
-
